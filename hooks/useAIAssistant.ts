@@ -1,9 +1,17 @@
+// src/hooks/useAIAssistant.ts
+
 import { useState, useCallback } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { useAuth } from '../contexts/AuthContext';
 import type { ChatMessage } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!apiKey) {
+    console.error("VITE_GEMINI_API_KEY is not defined. Check your .env file and restart your server.");
+}
+
+const genAI = new GoogleGenerativeAI(apiKey!);
 
 export const useAIAssistant = () => {
   const [isAssistantOpen, setAssistantOpen] = useState(false);
@@ -15,7 +23,7 @@ export const useAIAssistant = () => {
     setAssistantOpen(prev => !prev);
     if (messages.length === 0) {
         setMessages([
-            { sender: 'ai', text: `Hello ${user?.name.split(' ')[0] || ''}! I'm Ava, your personal wellness assistant. How can I help you today?` }
+            { sender: 'ai', text: `Hello ${user?.name.split(' ')[0] || ''}! I'm Ava. How can I help you today?` }
         ]);
     }
   }, [messages.length, user]);
@@ -26,49 +34,38 @@ export const useAIAssistant = () => {
     const userMessage: ChatMessage = { sender: 'user', text: message };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-
-    // Construct a detailed context for the AI
-    const context = `
-      You are Ava (Aviation Virtual Assistant), a friendly and professional AI health assistant for aviation crew.
-      Your goal is to provide helpful, concise, and accurate information based on the user's real-time data.
-      Keep your answers brief and to the point.
       
-      CURRENT USER DATA:
+    const context = `
+      You are Ava, a helpful AI assistant for aviation crew. Keep your answers brief.
+      
+      USER DATA:
       - Name: ${user?.name}
       - Role: ${user?.role}
-      - High Fatigue Risk Detected: ${fatigueRisk ? 'Yes' : 'No'}
+      - High Fatigue Risk: ${fatigueRisk ? 'Yes' : 'No'}
       
       SMARTWATCH DATA:
       - Heart Rate: ${smartwatchData?.heartRate} bpm
       - SpO2: ${smartwatchData?.spO2}%
-      - Stress Level: ${smartwatchData?.stressLevel}/10
-      - Daily Steps: ${smartwatchData?.dailySteps.current} / ${smartwatchData?.dailySteps.goal}
-      - Water Intake: ${smartwatchData?.waterIntake.current}ml / ${smartwatchData?.waterIntake.goal}ml
+      - Stress: ${smartwatchData?.stressLevel}/10
       
-      UPCOMING SCHEDULE (next 3 events):
-      ${schedule.slice(0, 3).map(s => `- ${s.title} from ${new Date(s.start).toLocaleString()} to ${new Date(s.end).toLocaleString()}`).join('\n')}
-
-      RECENT EXPENSES (last 3):
-      ${expenses.slice(0, 3).map(e => `- ${e.description} for ${e.amount} ${e.currency} on ${e.date}`).join('\n')}
-
-      Answer the following user query based ONLY on the data provided above.
-      Do not invent information. If the data is not available, say so.
+      UPCOMING SCHEDULE (next 3):
+      ${schedule.slice(0, 3).map(s => `- ${s.title} on ${new Date(s.start).toLocaleDateString()}`).join('\n')}
     `;
     
     const prompt = `${context}\n\nUser Query: "${message}"`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
 
-        const aiMessage: ChatMessage = { sender: 'ai', text: response.text };
+        const aiMessage: ChatMessage = { sender: 'ai', text: text };
         setMessages(prev => [...prev, aiMessage]);
 
     } catch (error) {
         console.error("AI Assistant Error:", error);
-        const errorMessage: ChatMessage = { sender: 'ai', text: "I'm sorry, I'm having trouble connecting right now. Please try again later." };
+        const errorMessage: ChatMessage = { sender: 'ai', text: "I'm sorry, I'm having trouble connecting right now." };
         setMessages(prev => [...prev, errorMessage]);
     } finally {
         setIsLoading(false);

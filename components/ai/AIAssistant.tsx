@@ -1,111 +1,108 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useAIAssistant } from '../../hooks/useAIAssistant';
-import { PaperAirplaneIcon, XMarkIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import { useState, useCallback, createContext, useContext } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const AIAssistant: React.FC = () => {
-    const { isAssistantOpen, messages, isLoading, toggleAssistant, sendMessage } = useAIAssistant();
-    const [input, setInput] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+// Auth context and types
+export const AuthContext = createContext({
+  user: null,
+  schedule: [],
+  smartwatchData: null,
+  fatigueRisk: null,
+  expenses: [],
+});
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+// Chat message type for AI assistant
+export interface ChatMessage {
+  sender: 'user' | 'ai';
+  text: string;
+}
 
-    const handleSend = (message: string) => {
-        if (message.trim()) {
-            sendMessage(message);
-            setInput('');
-        }
-    };
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-    const handleFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        handleSend(input);
-    };
-    
-    const quickActions = [
-        "Check my fatigue risk",
-        "Am I hydrated?",
-        "What's my next flight?",
-    ];
+if (!apiKey) {
+    console.error("VITE_GEMINI_API_KEY is not defined. Check .env file and restart server.");
+}
 
-    if (!isAssistantOpen) {
-        return (
-            <button
-                onClick={toggleAssistant}
-                className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 h-16 w-16 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-transform hover:scale-110 z-40"
-                aria-label="Open AI Assistant"
-            >
-                <SparklesIcon className="h-8 w-8" />
-            </button>
-        );
+const genAI = new GoogleGenerativeAI(apiKey!);
+
+export const useAIAssistant = () => {
+  const [isAssistantOpen, setAssistantOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { user, schedule, smartwatchData, fatigueRisk, expenses } = useAuth();
+
+  const toggleAssistant = useCallback(() => {
+    setAssistantOpen(prev => !prev);
+    if (messages.length === 0) {
+        setMessages([
+            { sender: 'ai', text: `Hello ${user?.name.split(' ')[0] || ''}! I'm Ava, your personal wellness assistant. How can I help you today?` }
+        ]);
     }
+  }, [messages.length, user]);
+  
+  const sendMessage = useCallback(async (message: string) => {
+    if (!message.trim() || isLoading) return;
 
-    return (
-        <div className="fixed bottom-4 right-4 w-[calc(100%-2rem)] max-w-sm h-[70%] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-2xl">
-                <div className="flex items-center">
-                    <SparklesIcon className="h-6 w-6 text-indigo-500" />
-                    <h3 className="ml-2 text-lg font-bold text-gray-900">Ava</h3>
-                </div>
-                <button onClick={toggleAssistant} className="p-1 rounded-full hover:bg-gray-200">
-                    <XMarkIcon className="h-6 w-6 text-gray-600" />
-                </button>
-            </div>
+    const userMessage: ChatMessage = { sender: 'user', text: message };
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+      
+    const context = `
+      You are Ava (Aviation Virtual Assistant), a friendly and professional AI health assistant for aviation crew.
+      Your goal is to provide helpful, concise, and accurate information based on the user's real-time data.
+      Keep your answers brief and to the point.
+      
+      CURRENT USER DATA:
+      - Name: ${user?.name}
+      - Role: ${user?.role}
+      - High Fatigue Risk Detected: ${fatigueRisk ? 'Yes' : 'No'}
+      
+      SMARTWATCH DATA:
+      - Heart Rate: ${smartwatchData?.heartRate} bpm
+      - SpO2: ${smartwatchData?.spO2}%
+      - Stress Level: ${smartwatchData?.stressLevel}/10
+      - Daily Steps: ${smartwatchData?.dailySteps.current} / ${smartwatchData?.dailySteps.goal}
+      - Water Intake: ${smartwatchData?.waterIntake.current}ml / ${smartwatchData?.waterIntake.goal}ml
+      
+      UPCOMING SCHEDULE (next 3 events):
+      ${schedule.slice(0, 3).map(s => `- ${s.title} from ${new Date(s.start).toLocaleString()} to ${new Date(s.end).toLocaleString()}`).join('\n')}
 
-            {/* Messages */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-                        {msg.sender === 'ai' && <div className="h-7 w-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0"><SparklesIcon className="h-4 w-4 text-indigo-500"/></div>}
-                        <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${msg.sender === 'user' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
-                            <p className="text-sm">{msg.text}</p>
-                        </div>
-                    </div>
-                ))}
-                {isLoading && (
-                    <div className="flex items-end gap-2">
-                        <div className="h-7 w-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0"><SparklesIcon className="h-4 w-4 text-indigo-500"/></div>
-                        <div className="max-w-[80%] rounded-2xl px-4 py-2 bg-gray-100 text-gray-800 rounded-bl-none">
-                            <div className="flex items-center space-x-1">
-                                <span className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                <span className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                <span className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce"></span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
+      RECENT EXPENSES (last 3):
+      ${expenses.slice(0, 3).map(e => `- ${e.description} for ${e.amount} ${e.currency} on ${e.date}`).join('\n')}
 
-            {/* Input Form */}
-            <div className="p-4 border-t bg-white rounded-b-2xl">
-                {messages.length <= 1 && (
-                     <div className="flex flex-wrap gap-2 mb-3">
-                        {quickActions.map(action => (
-                            <button key={action} onClick={() => handleSend(action)} className="px-3 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-full hover:bg-indigo-100">
-                                {action}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                <form onSubmit={handleFormSubmit} className="flex items-center space-x-2">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Ask Ava anything..."
-                        className="flex-1 w-full px-4 py-2 border border-gray-300 rounded-full bg-gray-50 focus:ring-1 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
-                        disabled={isLoading}
-                    />
-                    <button type="submit" disabled={isLoading || !input.trim()} className="h-10 w-10 bg-indigo-500 text-white rounded-full flex-shrink-0 flex items-center justify-center disabled:bg-gray-300">
-                        <PaperAirplaneIcon className="h-5 w-5" />
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
+      Answer the following user query based ONLY on the data provided above.
+      Do not invent information. If the data is not available, say so.
+    `;
+    
+    const prompt = `${context}\n\nUser Query: "${message}"`;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+
+        const aiMessage: ChatMessage = { sender: 'ai', text: text };
+        setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error) {
+        console.error("AI Assistant Error:", error);
+        const errorMessage: ChatMessage = { sender: 'ai', text: "I'm sorry, I'm having trouble connecting right now. Please try again later." };
+        setMessages(prev => [...prev, errorMessage]);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [isLoading, user, schedule, smartwatchData, fatigueRisk, expenses]);
+
+  return {
+    isAssistantOpen,
+    messages,
+    isLoading,
+    toggleAssistant,
+    sendMessage,
+  };
 };
-
-export default AIAssistant;
+function useAuth(): { user: any; schedule: any; smartwatchData: any; fatigueRisk: any; expenses: any; } {
+    // Example: Replace with your actual context/provider logic
+    const { user, schedule, smartwatchData, fatigueRisk, expenses } = useContext(AuthContext);
+    return { user, schedule, smartwatchData, fatigueRisk, expenses };
+}
