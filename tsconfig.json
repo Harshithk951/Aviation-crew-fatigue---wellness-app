@@ -20,7 +20,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Vite Specific */
+    /* THIS IS THE LINE THAT FIXES YOUR ERROR */
     "types": ["vite/client"]
   },
   "include": ["src"],
