@@ -78,3 +78,73 @@ The application follows a modular, component-based architecture optimized for ma
   ├── constants/         # Mock data and configuration constants
   ├── App.tsx            # Main Application Entry & Router
   └── main.tsx           # DOM Renderer
+code
+Markdown
+download
+content_copy
+expand_less
+### **🚀 Local Development Setup**
+
+Follow these steps to get a copy of the project up and running on your local machine.
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/Harshithk951/Aviation-crew-fatigue---wellness-app.git
+cd Aviation-crew-fatigue---wellness-app
+
+2. Install Dependencies
+
+code
+Bash
+download
+content_copy
+expand_less
+npm install
+
+3. Configure Environment Variables
+This project requires a Google Gemini API key for the AI Assistant features.
+
+Create a file named .env in the root directory.
+
+Add the following line to the file:
+
+code
+Env
+download
+content_copy
+expand_less
+VITE_GEMINI_API_KEY="your_actual_api_key_here"
+
+4. Start the Application
+
+code
+Bash
+download
+content_copy
+expand_less
+npm run dev
+
+Open your browser and navigate to http://localhost:5173 to view the app.
+
+🌐 Deployment Guide
+
+This project is optimized for Vercel.
+
+Push to GitHub: Ensure your latest code is pushed to the main branch.
+
+Import to Vercel: Connect your GitHub repository to a new Vercel project.
+
+Set Environment Variables (Crucial):
+
+Go to Settings > Environment Variables on your Vercel project dashboard.
+
+Add a new variable named VITE_GEMINI_API_KEY.
+
+Paste your production Google Gemini API Key as the value.
+
+Deploy: Vercel will automatically build and deploy your application.
+
+<div align="center">
+<p>Built with ❤️ by <strong>Harshith</strong></p>
+</div>
+```
